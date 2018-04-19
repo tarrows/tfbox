@@ -1,4 +1,5 @@
 import tensorflow as tf
+import pickle
 
 
 def conv2d_maxpool(x_tensor, conv_num_outputs, conv_ksize, conv_strides, pool_ksize, pool_strides):
@@ -29,7 +30,7 @@ def conv2d_maxpool(x_tensor, conv_num_outputs, conv_ksize, conv_strides, pool_ks
     return conv
 
 
-def conv_net(x, keep_prob):
+def conv_net(x_tensor, keep_probability):
     """
     Create a convolutional neural network model
     : x: Placeholder tensor that holds image data.
@@ -42,18 +43,66 @@ def conv_net(x, keep_prob):
     pool_ksize = (2, 2)
     pool_strides = (2, 2)
 
-    cnn = conv2d_maxpool(x, 10, conv_ksize, conv_strides, pool_ksize, pool_strides)
+    cnn = conv2d_maxpool(x_tensor, 10, conv_ksize, conv_strides, pool_ksize, pool_strides)
     cnn = conv2d_maxpool(cnn, 25, conv_ksize, conv_strides, pool_ksize, pool_strides)
     cnn = conv2d_maxpool(cnn, 40, conv_ksize, conv_strides, pool_ksize, pool_strides)
     cnn = tf.contrib.layers.flatten(cnn)
 
     cnn = tf.contrib.layers.fully_connected(inputs=cnn, num_outputs=64, activation_fn=tf.nn.relu)
-    cnn = tf.nn.dropout(cnn, keep_prob)
+    cnn = tf.nn.dropout(cnn, keep_probability)
     cnn = tf.contrib.layers.fully_connected(inputs=cnn, num_outputs=32, activation_fn=tf.nn.relu)
-    cnn = tf.nn.dropout(cnn, keep_prob)
+    cnn = tf.nn.dropout(cnn, keep_probability)
 
     output = tf.contrib.layers.fully_connected(inputs=cnn, num_outputs=10)
     return output
+
+
+def train_neural_network(session, optimizer, keep_probability, feature_batch, label_batch):
+    """
+    Optimize the session on a batch of images and labels
+    : session: Current TensorFlow session
+    : optimizer: TensorFlow optimizer function
+    : keep_probability: keep probability
+    : feature_batch: Batch of Numpy image data
+    : label_batch: Batch of Numpy label data
+    """
+    feeds = {x: feature_batch,  y: label_batch, keep_prob: keep_probability}
+    session.run(optimizer, feed_dict=feeds)
+
+
+def print_stats(session, feature_batch, label_batch, cost, accuracy):
+    """
+    Print information about loss and validation accuracy
+    : session: Current TensorFlow session
+    : feature_batch: Batch of Numpy image data
+    : label_batch: Batch of Numpy label data
+    : cost: TensorFlow cost function
+    : accuracy: TensorFlow accuracy function
+    """
+    feeds = {x: feature_batch, y: label_batch, keep_prob: 1.0}
+    accuracy = session.run(accuracy, feed_dict=feeds)
+    loss = session.run(cost, feed_dict=feeds)
+    print('accuracy: {:>2}, loss: {} '.format(accuracy, loss))
+
+
+def batch_features_labels(features, labels, batch_size):
+    """
+    Split features and labels into batches
+    """
+    for start in range(0, len(features), batch_size):
+        end = min(start + batch_size, len(features))
+        yield features[start:end], labels[start:end]
+
+
+def load_preprocess_training_batch(batch_id, batch_size):
+    """
+    Load the Preprocessed Training data and return them in batches of <batch_size> or less
+    """
+    filename = 'preprocess_batch_' + str(batch_id) + '.p'
+    features, labels = pickle.load(open(filename, mode='rb'))
+
+    # Return the training data in batches of size <batch_size> or less
+    return batch_features_labels(features, labels, batch_size)
 
 
 # Remove previous weights, bias, inputs, etc..
@@ -74,18 +123,28 @@ logits = conv_net(x, keep_prob)
 logits = tf.identity(logits, name='logits')
 
 # Loss and Optimizer
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
-optimizer = tf.train.AdamOptimizer().minimize(cost)
+cost_ = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
+opt = tf.train.AdamOptimizer().minimize(cost_)
+
+# Accuracy
+correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
+accr = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
+
+# Hyperparameters
+epochs = 20
+batchsize = 128
+keep_prob = 0.5
 
 
-def train_neural_network(session, optimizer, keep_probability, feature_batch, label_batch):
-    """
-    Optimize the session on a batch of images and labels
-    : session: Current TensorFlow session
-    : optimizer: TensorFlow optimizer function
-    : keep_probability: keep probability
-    : feature_batch: Batch of Numpy image data
-    : label_batch: Batch of Numpy label data
-    """
-    feeds = {x: feature_batch,  y: label_batch, keep_prob: keep_probability}
-    session.run(optimizer, feed_dict=feeds)
+print('Checking the Training on a Single Batch...')
+with tf.Session() as sess:
+    # Initializing the variables
+    sess.run(tf.global_variables_initializer())
+
+    # Training cycle
+    for epoch in range(epochs):
+        batch_i = 1
+        for batch_features, batch_labels in load_preprocess_training_batch(batch_i, batchsize):
+            train_neural_network(sess, opt, keep_prob, batch_features, batch_labels)
+            print('Epoch {:>2}, Batch {}:  '.format(epoch + 1, batch_i), end='')
+            print_stats(sess, batch_features, batch_labels, cost_, accr)
