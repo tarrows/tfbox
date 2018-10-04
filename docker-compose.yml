@@ -1,0 +1,8 @@
+version: "3.0"
+services:
+  jupyter:
+    image: jupyter/tensorflow-notebook:latest
+    ports: 
+      - "7288:8888"
+    volumes:
+      - ./work:/home/jovyan/work

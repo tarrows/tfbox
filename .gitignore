@@ -1,3 +1,12 @@
+# cache
+__pycache__/
+
+# jupyter notebook
+.ipynb_checkpoints/
+
+# tensorboard result
+tb_*/
+
 # ignore dataset
 **/*-py
 **/*.tar.gz
