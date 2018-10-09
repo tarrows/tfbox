@@ -11,6 +11,7 @@ from keras.application.inception_v3 import InceptionV3
 from keras.layers import Dense
 from keras.layers import GlobalAveragePooling2D
 from keras.models import Model
+from keras.optimizers import SGD
 # from keras.preprocessing import image
 
 base_model = InceptionV3(weights="imagenet", include_top=False)
@@ -29,3 +30,27 @@ x = Dense(1024, activation="relu")
 predictions = Dense(200, activation="softmax")(x)
 
 model = Model(inputs=base_model.input, outputs=predictions)
+
+# freeze all convolutional Inception V3 layers
+for layer in base_model.layers:
+    layer.trainable = False
+
+# compile the model (should be done after setting layers to non-trainable)
+model.compile(optimizer="rmsprop", loss="categorical_crossentropy")
+
+# train the model on the new data for a few epochs
+model.fit_generator(...)
+
+# train the 2 inception blocks
+for layer in model.layers[:249]:
+    layer.trainable = False
+for layer in model.layers[249:]:
+    layer.trainable = True
+
+# recompile the model for these modifications to take effect
+model.compile(optimizer=SGD(lr=0.0001, momentum=0.9),
+              loss="categorical_crossentropy")
+
+# train our model again (this time fine-tuning the top 2 inception blocks)
+# alongside the top Dense layers
+model.fit_generator(...)
