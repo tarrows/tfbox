@@ -44,7 +44,22 @@ mpl.use("Agg")
 
 
 def model_generator():
-    return Model()
+    nch = 256
+    g_input = Input(shape=[100])
+    H = Dense(nch * 14 * 14)(g_input)
+    H = BatchNormalization()(H)
+    H = Activation('relu')(H)
+    H = dim_ordering_reshape(nch, 14)(H)
+    H = UpSampling2D(size=(2, 2))(H)
+    H = Conv2D(int(nch / 2), (3, 3), padding='same')(H)
+    H = BatchNormalization()(H)
+    H = Activation('relu')(H)
+    H = Conv2D(int(nch / 4), (3, 3), padding='same')(H)
+    H = BatchNormalization()(H)
+    H = Activation('relu')(H)
+    H = Conv2D(1, (1, 1), padding='same')(H)
+    g_V = Activation('sigmoid')(H)
+    return Model(g_input, g_V)
 
 
 def model_discriminator():
