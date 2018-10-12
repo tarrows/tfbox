@@ -62,12 +62,27 @@ def model_generator():
     return Model(g_input, g_V)
 
 
-def model_discriminator():
-    return Model()
+def model_discriminator(input_shape=(1, 28, 28), dropout_rate=0.5):
+    nch = 512
+    d_input = dim_ordering_input(input_shape, name="input_x")
+    H = Conv2D(int(nch / 2), (5, 5), strides=(2, 2), padding='same',
+               activation='relu')(d_input)
+    H = LeakyReLU(0.2)(H)
+    H = Dropout(dropout_rate)(H)
+    H = Conv2D(nch, (5, 5), strides=(2, 2), padding='same',
+               activation='relu')(H)
+    H = LeakyReLU(0.2)(H)
+    H = Dropout(dropout_rate)(H)
+    H = Flatten()(H)
+    H = Dense(int(nch / 2))(H)
+    H = LeakyReLU(0.2)(H)
+    H = Dropout(dropout_rate)(H)
+    d_V = Dense(1, activation='sigmoid')
+    return Model(d_input, d_V)
 
 
 def mnist_process(x):
-    return x
+    return x.astype(np.float32) / 255.0
 
 
 def mnist_data():
@@ -78,5 +93,3 @@ def mnist_data():
 if __name__ == '__main__':
     # z in R^100
     latent_dim = 100
-
-
