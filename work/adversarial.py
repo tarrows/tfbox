@@ -93,3 +93,30 @@ def mnist_data():
 if __name__ == '__main__':
     # z in R^100
     latent_dim = 100
+    # x in R^{28 * 28}
+    input_shape = (1, 28, 28)
+    # generator (z -> x)
+    generator = model_generator()
+    # discriminator (x -> y)
+    discriminator = model_discriminator(input_shape=input_shape)
+    # gan (x -> yfake, yreal), z generated on GPU
+    gan = simple_gan(generator, discriminator,
+                     normal_latent_sampling(latent_dim,))
+    # print summary of models
+    generator.summary()
+    discriminator.summary()
+    gan.summary()
+
+    # build adversarial model
+    model = AdversarialModel(
+      base_model=gan,
+      player_params=[
+        generator.trainable_weights, discriminator.trainable_weights
+      ],
+      player_names=["generator", "discriminator"]
+    )
+    model.adversarial_compile(
+      adversarial_optimizer=AdversarialOptimizerSimultaneous(),
+      player_optimizers=[Adam(1e-4, decay=1e-4), Adam(1e-3, decay=1e-4)],
+      loss="binary_crossentropy"
+    )
