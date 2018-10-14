@@ -120,3 +120,20 @@ if __name__ == '__main__':
       player_optimizers=[Adam(1e-4, decay=1e-4), Adam(1e-3, decay=1e-4)],
       loss="binary_crossentropy"
     )
+
+    # train model
+    generator_cb = ImageGridCallback(
+      "output/gan_convolutional/epoch-{:03d}.png",
+      generator_sampler(latent_dim, generator)
+    )
+    callbacks = [generator_cb]
+
+    if K.backend() == "tensorflow":
+        callbacks.append(
+          TensorBoard(
+            log_dir=os.path.join("output/gan_convolutional/", "logs/"),
+            histogram_freq=0,
+            write_graph=True,
+            write_images=True
+          )
+        )
