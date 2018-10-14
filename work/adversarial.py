@@ -37,7 +37,7 @@ from keras_adversarial.image_grid_callback import ImageGridCallback
 from image_utils import dim_ordering_fix
 from image_utils import dim_ordering_input
 from image_utils import dim_ordering_reshape
-from image_utils import dim_ordering_unfix
+# from image_utils import dim_ordering_unfix
 
 # allows mpl to run with no DISPLAY defined
 mpl.use("Agg")
@@ -121,9 +121,16 @@ if __name__ == '__main__':
       loss="binary_crossentropy"
     )
 
+    zsamples = np.random.normal(size=(10 * 10, latent_dim))
+
+    def generator_sampler():
+        return generator.predict(zsamples).reshape((10, 10, 28, 28))
+
+    OUT_PATH = "output/gan_convolutional/"
+
     # train model
     generator_cb = ImageGridCallback(
-      "output/gan_convolutional/epoch-{:03d}.png",
+      os.path.join(OUT_PATH, "epoch-{:03d}.png"),
       generator_sampler(latent_dim, generator)
     )
     callbacks = [generator_cb]
@@ -131,9 +138,26 @@ if __name__ == '__main__':
     if K.backend() == "tensorflow":
         callbacks.append(
           TensorBoard(
-            log_dir=os.path.join("output/gan_convolutional/", "logs/"),
+            log_dir=os.path.join(OUT_PATH, "logs/"),
             histogram_freq=0,
             write_graph=True,
             write_images=True
           )
         )
+
+    xtrain, xtest = mnist_data()
+    xtrain = dim_ordering_fix(xtrain.reshape((-1, 1, 28, 28)))
+    xtest = dim_ordering_fix(xtest.reshape((-1, 1, 28, 28)))
+    y = gan_targets(xtrain.shape[0])
+    ytest = gan_targets(xtest.shape[0])
+
+    history = model.fit(
+      x=xtrain, y=y, validateioni_data=(xtest, ytest),
+      callbacks=callbacks, epochs=100, batch_size=32
+    )
+
+    df = pd.DataFrame(history.history)
+    df.to_csv(os.path.join(OUT_PATH, "history.csv"))
+
+    generator.save(os.path.join(OUT_PATH, "generator.h5"))
+    discriminator.save(os.path.join(OUT_PATH, "discriminator.h5"))
